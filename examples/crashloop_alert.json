@@ -1,0 +1,45 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PodCrashLooping\"}",
+  "status": "firing",
+  "receiver": "sre-agent",
+  "groupLabels": {
+    "alertname": "PodCrashLooping"
+  },
+  "commonLabels": {
+    "alertname": "PodCrashLooping",
+    "namespace": "payments",
+    "pod": "api-7c9d4f-xyz",
+    "severity": "critical",
+    "cluster": "prod-us-west"
+  },
+  "commonAnnotations": {
+    "description": "Pod payments/api-7c9d4f-xyz is in CrashLoopBackOff state",
+    "summary": "Pod has been crashing for 5 minutes",
+    "runbook_url": "https://runbooks.example.com/pod-crashloop"
+  },
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodCrashLooping",
+        "namespace": "payments",
+        "pod": "api-7c9d4f-xyz",
+        "deployment": "api",
+        "container": "api-server",
+        "severity": "critical",
+        "cluster": "prod-us-west",
+        "app": "payment-api"
+      },
+      "annotations": {
+        "description": "Pod payments/api-7c9d4f-xyz has restarted 12 times in the last 10 minutes",
+        "summary": "Container in CrashLoopBackOff",
+        "impact": "Payment processing degraded"
+      },
+      "startsAt": "2025-12-29T10:30:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=..."
+    }
+  ]
+}
