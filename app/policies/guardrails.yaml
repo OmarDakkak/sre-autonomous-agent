@@ -1,0 +1,76 @@
+# Guardrails for SRE Autonomous Agent
+# These rules ensure the agent operates safely in production environments
+
+# Actions that are NEVER allowed
+forbidden_actions:
+  - delete_namespace
+  - delete_service
+  - delete_pvc
+  - scale_to_zero_prod
+  - apply_without_pr
+  - modify_rbac
+  - change_network_policies
+  - delete_statefulset
+
+# Namespace access control
+allowed_namespaces:
+  read_write:
+    - staging
+    - dev
+    - test
+  read_only:
+    - prod
+    - production
+    - default
+    - kube-system
+
+# Remediation restrictions
+remediation_rules:
+  # Require human approval for these actions
+  require_approval:
+    - restart_deployment
+    - scale_replicas
+    - update_config
+    - rollback_deployment
+  
+  # Maximum safe values
+  max_replica_scale: 10
+  max_restart_attempts: 3
+  
+  # Time windows for changes
+  allowed_hours:
+    start: 8  # 8 AM
+    end: 20   # 8 PM
+    timezone: "UTC"
+  
+  # Blast radius control
+  max_simultaneous_changes: 1
+  cooldown_minutes: 5
+
+# Diagnostic tool permissions
+diagnostic_permissions:
+  allowed_kubectl_commands:
+    - describe
+    - get
+    - logs
+    - top
+    - events
+  
+  forbidden_kubectl_commands:
+    - delete
+    - apply
+    - create
+    - replace
+    - patch
+    - exec  # No arbitrary command execution
+
+# Logging and audit
+audit_config:
+  log_all_actions: true
+  require_incident_id: true
+  retention_days: 90
+  sensitive_fields:
+    - secrets
+    - passwords
+    - tokens
+    - certificates
