@@ -309,7 +309,7 @@ We chose LangGraph over CrewAI because:
 3. **Explicit guardrails** - Production safety requirements
 4. **Auditability** - Every decision is traceable
 
-## 🏆 Your Unfair Advantage
+## 🏆 Our Unfair Advantage
 
 - **Kubernetes expertise** = instant credibility
 - **Infra + AI** = very hard to replicate
@@ -321,7 +321,6 @@ We chose LangGraph over CrewAI because:
 2. ✅ **Connect to your cluster** (update kubeconfig)
 3. 📧 **Customize guardrails** for your environment
 4. 🚀 **Deploy webhook** for real alerts
-5. 💼 **Close pilot deals** ($10k-$50k)
 
 ---
 
