@@ -1,10 +1,10 @@
-# SRE Autonomous Agent 🤖
+# SRE Autonomous Agent
 
 An intelligent, agentic SRE system that automatically diagnoses Kubernetes incidents, proposes safe remediations, and generates comprehensive postmortems.
 
 **NOT ChatOps. This is reasoning + action.**
 
-## 🎯 What It Does
+## What It Does
 
 The agent autonomously:
 
@@ -16,7 +16,7 @@ The agent autonomously:
 6. **Requires human approval** (safety-first)
 7. **Documents everything** in detailed postmortems
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 Alert Event
@@ -35,13 +35,13 @@ Postmortem Writer
 ```
 
 Built on **LangGraph** for:
-- ✅ Deterministic workflows
-- ✅ Stateful checkpoints
-- ✅ Explicit guardrails
-- ✅ Human-in-the-loop controls
-- ✅ Full audit trails
+- Deterministic workflows
+- Stateful checkpoints
+- Explicit guardrails
+- Human-in-the-loop controls
+- Full audit trails
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -88,7 +88,7 @@ The agent will:
 
 Check `postmortems/INC-*.md` for the full report.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 sre-autonomous-agent/
@@ -122,19 +122,19 @@ sre-autonomous-agent/
 └── README.md
 ```
 
-## 🛡️ Safety Guardrails
+## Safety Guardrails
 
 The agent enforces strict safety policies:
 
 ### Forbidden Actions
-- ❌ Delete namespaces/services
-- ❌ Modify RBAC/network policies
-- ❌ Execute arbitrary commands
-- ❌ Auto-apply without approval
+- Delete namespaces/services
+- Modify RBAC/network policies
+- Execute arbitrary commands
+- Auto-apply without approval
 
 ### Namespace Access
-- ✅ **Read/Write:** staging, dev, test
-- ✅ **Read-only:** prod, production
+- **Read/Write:** staging, dev, test
+- **Read-only:** prod, production
 
 ### Human Approval Required
 - Restart deployments
@@ -144,7 +144,7 @@ The agent enforces strict safety policies:
 
 See [app/policies/guardrails.yaml](app/policies/guardrails.yaml) for full policy.
 
-## 🎯 MVP Scope (Phase 1)
+## MVP Scope (Phase 1)
 
 **Incident Type:** CrashLoopBackOff only
 
@@ -159,7 +159,7 @@ See [app/policies/guardrails.yaml](app/policies/guardrails.yaml) for full policy
 - Multiple incident types (coming in Phase 2)
 - Slack integration (webhook placeholder ready)
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -183,27 +183,27 @@ Edit `app/policies/guardrails.yaml` to customize:
 - Risk thresholds
 - Time windows for changes
 
-## 📊 Example Output
+## Example Output
 
 After running on the example alert:
 
 ```
-🚨 Alert received: INC-20251229-a3f8b2e1
+Alert received: INC-20251229-a3f8b2e1
 Alert: PodCrashLooping
 
-✅ Triage: CrashLoopBackOff (critical)
-🧠 Hypotheses: 3 generated
-🔍 Diagnostics: Root cause identified
-💡 Remediation: Config change (low risk)
+Triage: CrashLoopBackOff (critical)
+Hypotheses: 3 generated
+Diagnostics: Root cause identified
+Remediation: Config change (low risk)
 
-🚨 HUMAN APPROVAL REQUIRED
+HUMAN APPROVAL REQUIRED
 Incident: CrashLoopBackOff
 Root Cause: Missing DATABASE_URL environment variable
 Proposed: Add DATABASE_URL to deployment env
 Risk: low
 Requires PR: Yes
 
-📝 Postmortem saved: postmortems/INC-20251229-a3f8b2e1.md
+Postmortem saved: postmortems/INC-20251229-a3f8b2e1.md
 ```
 
 ### Sample Postmortem
@@ -215,7 +215,7 @@ See generated markdown with:
 - Preventive measures
 - Lessons learned
 
-## 🚢 Production Deployment
+## Production Deployment
 
 ### Webhook Server (Coming)
 
@@ -241,32 +241,7 @@ def receive_alert(alert: AlertPayload):
 # Optional: write access to staging namespaces
 ```
 
-## 💰 Business Value
-
-### Why This Sells
-
-1. **Downtime = Revenue Loss**
-   - Every minute of downtime costs thousands
-   - Faster MTTR = direct ROI
-
-2. **SRE Burnout**
-   - On-call engineers are exhausted
-   - 3am alerts for repetitive issues
-   - This handles tier-1 triage automatically
-
-3. **Trust & Safety**
-   - Explicit guardrails
-   - Human approval required
-   - Full audit trails
-   - "We don't let LLMs break prod"
-
-### Pricing Model
-
-- **Tier 1:** $500/cluster/month (staging only)
-- **Tier 2:** $2,000/cluster/month (prod read-only)
-- **Enterprise:** $50k-$250k/year (multi-cluster, custom)
-
-## 🔮 Roadmap
+## Roadmap
 
 ### Phase 2: Multi-Incident
 - OOMKilled
@@ -284,7 +259,7 @@ def receive_alert(alert: AlertPayload):
 - Custom playbooks
 - Team-specific policies
 
-## 🤝 Contributing
+## Contributing
 
 This is a commercial product template. For production use:
 
@@ -294,13 +269,13 @@ This is a commercial product template. For production use:
 4. Set up CI/CD
 5. Harden security (secrets management)
 
-## 📄 License
+## License
 
 Proprietary - Commercial Use
 
 ---
 
-## 🎓 Why LangGraph?
+## Why LangGraph?
 
 We chose LangGraph over CrewAI because:
 
@@ -309,19 +284,19 @@ We chose LangGraph over CrewAI because:
 3. **Explicit guardrails** - Production safety requirements
 4. **Auditability** - Every decision is traceable
 
-## 🏆 Our Unfair Advantage
+## Our Unfair Advantage
 
 - **Kubernetes expertise** = instant credibility
 - **Infra + AI** = very hard to replicate
 - **Safety-first** = enterprise-ready from day one
 
-## 📞 Next Steps
+## Next Steps
 
-1. ✅ **Run the demo** with example alert
-2. ✅ **Connect to your cluster** (update kubeconfig)
-3. 📧 **Customize guardrails** for your environment
-4. 🚀 **Deploy webhook** for real alerts
+1. **Run the demo** with example alert
+2. **Connect to your cluster** (update kubeconfig)
+3. **Customize guardrails** for your environment
+4. **Deploy webhook** for real alerts
 
 ---
 
-**Built with LangGraph, Kubernetes, and AI that doesn't break production.** 🚀
+**Built with LangGraph, Kubernetes, and AI that doesn't break production.**
