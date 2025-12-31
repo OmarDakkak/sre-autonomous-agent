@@ -1,6 +1,6 @@
-# 📋 TODO & Development Roadmap
+# TODO & Development Roadmap
 
-## Phase 1: MVP (Current) ✅
+## Phase 1: MVP (Current)
 
 - [x] Project structure setup
 - [x] LangGraph state definition
@@ -17,7 +17,7 @@
 - [x] Main workflow orchestration
 - [x] Documentation
 
-## Phase 1.5: Production Ready 🚧
+## Phase 1.5: Production Ready
 
 ### Critical Improvements
 - [ ] Replace `eval()` with proper JSON parsing
