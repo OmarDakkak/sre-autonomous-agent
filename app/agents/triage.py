@@ -11,8 +11,12 @@ Responsibilities:
 from typing import Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from dotenv import load_dotenv
 
 from app.graph.state import IncidentState, add_timeline_entry
+
+# Load environment variables
+load_dotenv()
 
 
 TRIAGE_SYSTEM_PROMPT = """You are a Kubernetes SRE triage specialist.
@@ -74,7 +78,7 @@ Classify this incident precisely.
 """
     
     # Use LLM for classification
-    llm = ChatOpenAI(model="gpt-4", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
     messages = [
         SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
@@ -83,9 +87,32 @@ Classify this incident precisely.
     
     response = llm.invoke(messages)
     
-    # Parse response (simplified - add proper JSON parsing)
-    # For MVP, assume structured output
-    result = eval(response.content)  # TODO: Use proper JSON parsing
+    # Parse response
+    import json
+    try:
+        # Try to extract JSON from response
+        response_text = response.content
+        # Find JSON block
+        start = response_text.find('{')
+        end = response_text.rfind('}') + 1
+        if start >= 0 and end > start:
+            json_text = response_text[start:end]
+            result = json.loads(json_text)
+        else:
+            # Fallback parsing
+            result = {
+                "incident_type": state["alert"].get("commonLabels", {}).get("alertname", "Unknown"),
+                "severity": "high",
+                "affected_resources": state["alert"].get("commonLabels", {}),
+                "reasoning": "Auto-parsed from alert"
+            }
+    except Exception as e:
+        result = {
+            "incident_type": state["alert"].get("commonLabels", {}).get("alertname", "Unknown"),
+            "severity": "high",
+            "affected_resources": state["alert"].get("commonLabels", {}),
+            "reasoning": f"Parse error: {str(e)}"
+        }
     
     # Update state
     state["incident_type"] = result["incident_type"]

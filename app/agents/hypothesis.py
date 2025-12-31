@@ -9,8 +9,12 @@ Responsibilities:
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from dotenv import load_dotenv
 
 from app.graph.state import IncidentState, Hypothesis, add_timeline_entry
+
+# Load environment variables
+load_dotenv()
 
 
 HYPOTHESIS_SYSTEM_PROMPT = """You are a Kubernetes SRE diagnostic specialist.
@@ -71,7 +75,7 @@ Alert Annotations:
 Generate hypotheses for this incident.
 """
     
-    llm = ChatOpenAI(model="gpt-4", temperature=0.3)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
     
     messages = [
         SystemMessage(content=HYPOTHESIS_SYSTEM_PROMPT),
@@ -81,7 +85,32 @@ Generate hypotheses for this incident.
     response = llm.invoke(messages)
     
     # Parse response
-    hypotheses_data = eval(response.content)  # TODO: Proper JSON parsing
+    import json
+    try:
+        response_text = response.content
+        # Find JSON array
+        start = response_text.find('[')
+        end = response_text.rfind(']') + 1
+        if start >= 0 and end > start:
+            json_text = response_text[start:end]
+            hypotheses_data = json.loads(json_text)
+        else:
+            # Fallback
+            hypotheses_data = [
+                {
+                    "description": "Analysis needed - see alert details",
+                    "confidence": 0.5,
+                    "category": "unknown"
+                }
+            ]
+    except Exception as e:
+        hypotheses_data = [
+            {
+                "description": f"Parse error: {str(e)}",
+                "confidence": 0.3,
+                "category": "error"
+            }
+        ]
     
     hypotheses = [
         Hypothesis(

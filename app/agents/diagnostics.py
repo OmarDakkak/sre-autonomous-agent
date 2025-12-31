@@ -10,8 +10,7 @@ Responsibilities:
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain_core.prompts import ChatPromptTemplate
+from dotenv import load_dotenv
 
 from app.graph.state import IncidentState, DiagnosticResult, add_timeline_entry
 from app.tools.kubernetes import (
@@ -58,6 +57,9 @@ def diagnostics_agent(state: IncidentState) -> IncidentState:
     Run diagnostics to identify root cause
     """
     
+    # Load environment variables
+    load_dotenv()
+    
     affected_resources = state["affected_resources"]
     namespace = affected_resources.get("namespace")
     pod_name = affected_resources.get("pod")
@@ -66,33 +68,61 @@ def diagnostics_agent(state: IncidentState) -> IncidentState:
         state["errors"].append("Missing namespace or pod name for diagnostics")
         return state
     
-    # Create tool-using agent
-    tools = [
-        get_pod_description,
-        get_pod_logs,
-        get_pod_events,
-        get_recent_deployments
-    ]
+    # Initialize LLM
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
-    llm = ChatOpenAI(model="gpt-4", temperature=0)
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", DIAGNOSTICS_SYSTEM_PROMPT),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}")
-    ])
-    
-    agent = create_openai_tools_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-    
-    # Build diagnostic query
-    hypotheses_text = "\n".join([
-        f"{i+1}. {h['description']} (confidence: {h['confidence']})"
-        for i, h in enumerate(state["hypotheses"][:3])
-    ])
-    
-    query = f"""
-Investigate this incident:
+    # Gather diagnostic data directly
+    try:
+        # Get pod description
+        pod_desc = get_pod_description.invoke({"namespace": namespace, "pod_name": pod_name})
+        
+        # Get pod logs
+        pod_logs = get_pod_logs.invoke({"namespace": namespace, "pod_name": pod_name, "tail_lines": 100})
+        
+        # Get pod events
+        pod_events = get_pod_events.invoke({"namespace": namespace, "pod_name": pod_name})
+        
+        # Get deployment history
+        deployment_name = affected_resources.get("deployment", "")
+        deployment_history = ""
+        if deployment_name:
+            deployment_history = get_recent_deployments.invoke({
+                "namespace": namespace,
+                "deployment_name": deployment_name,
+                "limit": 3
+            })
+        
+        # Store all diagnostic results
+        state["diagnostics"].append(
+            DiagnosticResult(
+                source="pod_description",
+                data={"output": pod_desc},
+                timestamp=state["updated_at"]
+            )
+        )
+        state["diagnostics"].append(
+            DiagnosticResult(
+                source="pod_logs",
+                data={"output": pod_logs},
+                timestamp=state["updated_at"]
+            )
+        )
+        state["diagnostics"].append(
+            DiagnosticResult(
+                source="pod_events",
+                data={"output": pod_events},
+                timestamp=state["updated_at"]
+            )
+        )
+        
+        # Build diagnostic summary for LLM analysis
+        hypotheses_text = "\n".join([
+            f"{i+1}. {h['description']} (confidence: {h['confidence']})"
+            for i, h in enumerate(state["hypotheses"][:3])
+        ])
+        
+        analysis_prompt = f"""
+Analyze this Kubernetes incident and identify the root cause:
 
 Incident Type: {state['incident_type']}
 Namespace: {namespace}
@@ -101,35 +131,74 @@ Pod: {pod_name}
 Top Hypotheses:
 {hypotheses_text}
 
-Use the diagnostic tools to:
-1. Gather evidence
-2. Validate hypotheses
-3. Identify the root cause
+Pod Description:
+{pod_desc[:2000]}
 
-Be thorough but focused.
+Pod Logs:
+{pod_logs[:2000]}
+
+Pod Events:
+{pod_events[:1000]}
+
+Deployment History:
+{deployment_history[:1000] if deployment_history else "Not available"}
+
+Based on this evidence, provide:
+1. The root cause (be specific)
+2. Key evidence supporting this conclusion
+3. Confidence level (0.0 to 1.0)
+
+Output as JSON:
+{{
+    "root_cause": "specific root cause",
+    "evidence": ["evidence 1", "evidence 2"],
+    "confidence": 0.95
+}}
 """
-    
-    result = agent_executor.invoke({"input": query})
-    
-    # Parse result (simplified)
-    root_cause_data = eval(result["output"])  # TODO: Proper parsing
-    
-    state["root_cause"] = root_cause_data["root_cause"]
-    
-    # Store diagnostics (simplified - should capture all tool outputs)
-    state["diagnostics"].append(
-        DiagnosticResult(
-            source="agent_investigation",
-            data=root_cause_data,
-            timestamp=state["updated_at"]
+        
+        messages = [
+            SystemMessage(content=DIAGNOSTICS_SYSTEM_PROMPT),
+            HumanMessage(content=analysis_prompt)
+        ]
+        
+        response = llm.invoke(messages)
+        
+        # Parse the response (simplified - in production use proper JSON parsing)
+        import json
+        try:
+            # Try to extract JSON from response
+            response_text = response.content
+            # Find JSON block
+            start = response_text.find('{')
+            end = response_text.rfind('}') + 1
+            if start >= 0 and end > start:
+                json_text = response_text[start:end]
+                root_cause_data = json.loads(json_text)
+            else:
+                # Fallback if no JSON found
+                root_cause_data = {
+                    "root_cause": response_text[:500],
+                    "evidence": ["See diagnostic output"],
+                    "confidence": 0.7
+                }
+        except:
+            root_cause_data = {
+                "root_cause": response.content[:500],
+                "evidence": ["See diagnostic output"],
+                "confidence": 0.7
+            }
+        
+        state["root_cause"] = root_cause_data["root_cause"]
+        
+        state = add_timeline_entry(
+            state,
+            agent="diagnostics",
+            action="root_cause_identified",
+            details=f"Root cause: {state['root_cause']}"
         )
-    )
-    
-    state = add_timeline_entry(
-        state,
-        agent="diagnostics",
-        action="root_cause_identified",
-        details=f"Root cause: {state['root_cause']}"
-    )
+        
+    except Exception as e:
+        state["errors"].append(f"Diagnostic error: {str(e)}")
+        return state
     
     return state

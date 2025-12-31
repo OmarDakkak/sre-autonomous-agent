@@ -11,8 +11,12 @@ Responsibilities:
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 import yaml
+from dotenv import load_dotenv
 
 from app.graph.state import IncidentState, RemediationAction, add_timeline_entry
+
+# Load environment variables
+load_dotenv()
 
 
 REMEDIATION_SYSTEM_PROMPT = """You are a Kubernetes SRE remediation specialist.
@@ -108,7 +112,7 @@ Diagnostics Summary:
 Propose remediation actions.
 """
     
-    llm = ChatOpenAI(model="gpt-4", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
     messages = [
         SystemMessage(content=REMEDIATION_SYSTEM_PROMPT),
@@ -118,7 +122,29 @@ Propose remediation actions.
     response = llm.invoke(messages)
     
     # Parse response
-    plan_data = eval(response.content)  # TODO: Proper JSON parsing
+    import json
+    try:
+        response_text = response.content
+        # Find JSON block
+        start = response_text.find('{')
+        end = response_text.rfind('}') + 1
+        if start >= 0 and end > start:
+            json_text = response_text[start:end]
+            plan_data = json.loads(json_text)
+        else:
+            raise ValueError("No JSON found in response")
+    except Exception as e:
+        # Fallback plan
+        plan_data = {
+            "primary": {
+                "action_type": "manual_investigation",
+                "description": f"Manual investigation required. Parse error: {str(e)}",
+                "risk_level": "low",
+                "requires_pr": False,
+                "estimated_impact": "Requires human analysis"
+            },
+            "alternatives": []
+        }
     
     primary = RemediationAction(
         action_type=plan_data["primary"]["action_type"],
