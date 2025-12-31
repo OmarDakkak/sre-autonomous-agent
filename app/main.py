@@ -9,9 +9,13 @@ import os
 from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 
 from app.graph.graph import create_incident_response_app
 from app.graph.state import create_initial_state
+
+# Load environment variables
+load_dotenv()
 
 
 def handle_alert_webhook(alert_payload: dict) -> dict:
@@ -28,7 +32,7 @@ def handle_alert_webhook(alert_payload: dict) -> dict:
     # Generate incident ID
     incident_id = f"INC-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8]}"
     
-    print(f"\n🚨 Alert received: {incident_id}")
+    print(f"\nAlert received: {incident_id}")
     print(f"Alert: {alert_payload.get('commonLabels', {}).get('alertname', 'Unknown')}")
     
     # Create initial state
@@ -55,7 +59,7 @@ def handle_alert_webhook(alert_payload: dict) -> dict:
         }
         
     except Exception as e:
-        print(f"❌ Error processing alert: {str(e)}")
+        print(f"Error processing alert: {str(e)}")
         return {
             "status": "error",
             "incident_id": incident_id,
@@ -74,7 +78,7 @@ def save_postmortem(incident_id: str, state: dict):
     with open(postmortem_path, "w") as f:
         f.write(state.get("postmortem", "No postmortem generated"))
     
-    print(f"\n📝 Postmortem saved: {postmortem_path}")
+    print(f"\nPostmortem saved: {postmortem_path}")
 
 
 def run_from_file(alert_file: str):
@@ -91,7 +95,7 @@ def run_from_file(alert_file: str):
     result = handle_alert_webhook(alert)
     
     print("\n" + "="*80)
-    print("📊 INCIDENT RESPONSE SUMMARY")
+    print("INCIDENT RESPONSE SUMMARY")
     print("="*80)
     print(f"Incident ID: {result['incident_id']}")
     print(f"Status: {result['status']}")

@@ -54,7 +54,7 @@ def human_approval_node(state: IncidentState) -> IncidentState:
     # For now, this is a placeholder that requires external state update
     
     print("\n" + "="*80)
-    print("🚨 HUMAN APPROVAL REQUIRED")
+    print("HUMAN APPROVAL REQUIRED")
     print("="*80)
     print(f"\nIncident: {state['incident_type']}")
     print(f"Root Cause: {state['root_cause']}")
@@ -76,7 +76,7 @@ def human_approval_node(state: IncidentState) -> IncidentState:
 def error_handler_node(state: IncidentState) -> IncidentState:
     """Handle errors in the workflow"""
     
-    print("\n❌ Error in incident response workflow:")
+    print("\nError in incident response workflow:")
     for error in state.get("errors", []):
         print(f"  - {error}")
     
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     app = create_incident_response_app()
     
     # Run workflow
-    print(f"\n🚀 Starting incident response for: {incident_id}\n")
+    print(f"\nStarting incident response for: {incident_id}\n")
     
     config = {"configurable": {"thread_id": incident_id}}
     
@@ -194,6 +194,6 @@ if __name__ == "__main__":
     
     # Print postmortem
     print("\n" + "="*80)
-    print("📝 POSTMORTEM")
+    print("POSTMORTEM")
     print("="*80)
     print(result.get("postmortem", "No postmortem generated"))
