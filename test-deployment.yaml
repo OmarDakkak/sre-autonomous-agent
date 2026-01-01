@@ -1,0 +1,65 @@
+---
+# Create a test namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+---
+# Deployment that will simulate a CrashLoopBackOff scenario
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: payments
+  labels:
+    app: payment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+      - name: api-server
+        image: busybox:latest
+        # This command will fail because DATABASE_URL is missing
+        # Simulating the CrashLoopBackOff scenario from our example
+        command: 
+          - sh
+          - -c
+          - |
+            if [ -z "$DATABASE_URL" ]; then
+              echo "ERROR: Missing DATABASE_URL environment variable"
+              exit 1
+            fi
+            echo "Starting API server..."
+            sleep 3600
+        # Intentionally NOT setting DATABASE_URL to cause crash
+        # env:
+        # - name: DATABASE_URL
+        #   value: "postgresql://db:5432/payments"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+              - echo
+              - alive
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+              - echo
+              - ready
+          initialDelaySeconds: 3
+          periodSeconds: 5

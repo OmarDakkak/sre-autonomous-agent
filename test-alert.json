@@ -1,0 +1,45 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PodCrashLooping\"}",
+  "status": "firing",
+  "receiver": "sre-agent",
+  "groupLabels": {
+    "alertname": "PodCrashLooping"
+  },
+  "commonLabels": {
+    "alertname": "PodCrashLooping",
+    "namespace": "payments",
+    "pod": "api-594c8fd944-9ddk9",
+    "severity": "critical",
+    "cluster": "minikube"
+  },
+  "commonAnnotations": {
+    "description": "Pod payments/api-594c8fd944-9ddk9 is in CrashLoopBackOff state",
+    "summary": "Pod has been crashing repeatedly",
+    "runbook_url": "https://runbooks.example.com/pod-crashloop"
+  },
+  "externalURL": "http://localhost",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodCrashLooping",
+        "namespace": "payments",
+        "pod": "api-594c8fd944-9ddk9",
+        "deployment": "api",
+        "container": "api-server",
+        "severity": "critical",
+        "cluster": "minikube",
+        "app": "payment-api"
+      },
+      "annotations": {
+        "description": "Pod payments/api-594c8fd944-9ddk9 is crashing",
+        "summary": "Container in CrashLoopBackOff",
+        "impact": "Payment processing unavailable"
+      },
+      "startsAt": "2025-12-31T18:54:17.740007Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://localhost/prometheus"
+    }
+  ]
+}

@@ -88,6 +88,30 @@ The agent will:
 
 Check `postmortems/INC-*.md` for the full report.
 
+### Launch Web UI 🎨
+
+```bash
+# Start the web interface
+./run-ui.sh
+```
+
+Then open **http://localhost:8501** in your browser.
+
+The UI provides:
+- **Dashboard** - Real-time incident monitoring and metrics
+- **Alert Submission** - Submit alerts manually, via templates, or JSON upload
+- **Incidents** - View incident history and timeline
+- **Postmortems** - Browse and download incident reports
+- **Settings** - Configure environment and guardrails
+
+Alternatively, run the API server:
+```bash
+# Start the REST API backend
+./run-api.sh
+```
+
+API Documentation available at **http://localhost:8000/docs**
+
 ## Project Structure
 
 ```
