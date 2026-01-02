@@ -101,6 +101,7 @@ The UI provides:
 - **Dashboard** - Real-time incident monitoring and metrics
 - **Alert Submission** - Submit alerts manually, via templates, or JSON upload
 - **Incidents** - View incident history and timeline
+- **Approvals** - Review and approve/reject remediation actions with one-click buttons
 - **Postmortems** - Browse and download incident reports
 - **Settings** - Configure environment and guardrails
 
@@ -111,6 +112,29 @@ Alternatively, run the API server:
 ```
 
 API Documentation available at **http://localhost:8000/docs**
+
+### Launch Webhook Server 🔔
+
+Receive alerts from Prometheus Alertmanager, PagerDuty, and other monitoring systems:
+
+```bash
+# Start the webhook server
+./run-webhook.sh
+```
+
+The webhook server will listen on **http://localhost:9000**
+
+Configure Alertmanager to send alerts:
+
+```yaml
+# alertmanager.yml
+receivers:
+  - name: 'sre-agent'
+    webhook_configs:
+      - url: 'http://your-server:9000/webhook/alertmanager'
+```
+
+See [Webhook Server Guide](docs/WEBHOOK_SERVER.md) for full setup instructions.
 
 ## Project Structure
 
@@ -131,17 +155,44 @@ sre-autonomous-agent/
 │   ├── tools/
 │   │   ├── kubernetes.py     # K8s API tools
 │   │   ├── prometheus.py     # Metrics queries
-│   │   └── logs.py           # Log analysis
+│   │   ├── logs.py           # Log analysis
+│   │   └── remediation_executor.py  # Execute approved fixes
+│   │
+│   ├── approval/
+│   │   └── manager.py        # Approval state management
+│   │
+│   ├── integrations/
+│   │   └── slack.py          # Slack notifications & approvals
+│   │
+│   ├── webhook/
+│   │   └── server.py         # Alertmanager webhook receiver
+│   │
+│   ├── cli/
+│   │   └── approve.py        # CLI approval commands
 │   │
 │   ├── policies/
 │   │   └── guardrails.yaml   # Safety policies
 │   │
 │   └── main.py               # Entry point
 │
+├── ui/
+│   ├── app.py                # Streamlit web interface
+│   └── api.py                # FastAPI REST API
+│
+├── tests/
+│   └── test_integration.py   # Real K8s integration tests
+│
+├── docs/
+│   ├── APPROVAL_WORKFLOW.md  # Approval workflow guide
+│   ├── SLACK_INTEGRATION.md  # Slack setup guide
+│   └── WEBHOOK_SERVER.md     # Webhook server guide
+│
 ├── examples/
 │   └── crashloop_alert.json  # Example alert
 │
 ├── postmortems/              # Generated reports
+├── approvals/                # Approval requests
+├── rollbacks/                # Pre-remediation snapshots
 ├── requirements.txt
 └── README.md
 ```
@@ -207,6 +258,73 @@ Edit `app/policies/guardrails.yaml` to customize:
 - Risk thresholds
 - Time windows for changes
 
+## Human Approval Workflow
+
+The agent **never** executes remediations without explicit human approval.
+
+### CLI Approval
+
+When the agent proposes a remediation, you'll see:
+
+```
+HUMAN APPROVAL REQUIRED
+================================================================================
+Approval ID: approval-abc123
+Incident: CrashLoopBackOff
+Root Cause: Missing DATABASE_URL environment variable
+
+Proposed Remediation:
+  Action: Add DATABASE_URL to deployment env
+  Risk: low
+  Requires PR: Yes
+
+To approve, run:
+  python -m app.cli.approve INC-20251229-a3f8b2e1
+================================================================================
+```
+
+**Approve the remediation:**
+
+```bash
+python -m app.cli.approve INC-20251229-a3f8b2e1
+```
+
+**List pending approvals:**
+
+```bash
+python -m app.cli.approve --list
+```
+
+**Reject a remediation:**
+
+```bash
+python -m app.cli.approve --reject INC-20251229-a3f8b2e1 --reason "Too risky"
+```
+
+### Automated Execution
+
+Once approved, the agent will:
+
+1. **Execute** the remediation (patch deployment, add env vars, etc.)
+2. **Verify** deployment health
+3. **Rollback** automatically if verification fails
+4. **Document** the outcome in the postmortem
+
+### Rollback Protection
+
+The executor saves deployment state before changes and automatically rolls back if:
+- Deployment fails health check within 60 seconds
+- New pods don't reach Ready state
+- Remediation execution throws errors
+
+Manual rollback is also available:
+
+```python
+from app.tools.remediation_executor import RemediationExecutor
+executor = RemediationExecutor()
+executor.rollback("INC-20251229-a3f8b2e1")
+```
+
 ## Example Output
 
 After running on the example alert:
@@ -227,6 +345,14 @@ Proposed: Add DATABASE_URL to deployment env
 Risk: low
 Requires PR: Yes
 
+[After approval]
+✓ Remediation approved for incident INC-20251229-a3f8b2e1
+Executing remediation...
+Added DATABASE_URL environment variable
+Waiting for deployment rollout...
+Deployment my-app is healthy
+✓ Successfully applied config change to my-app
+
 Postmortem saved: postmortems/INC-20251229-a3f8b2e1.md
 ```
 
@@ -241,29 +367,120 @@ See generated markdown with:
 
 ## Production Deployment
 
-### Webhook Server (Coming)
+### Webhook Server
 
-```python
-# Future: FastAPI webhook endpoint
-@app.post("/alerts")
-def receive_alert(alert: AlertPayload):
-    return handle_alert_webhook(alert.dict())
+The webhook server receives alerts from Prometheus Alertmanager and other monitoring systems:
+
+```bash
+# Start webhook server
+./run-webhook.sh
+
+# Configure Alertmanager
+cat > alertmanager.yml << EOF
+receivers:
+  - name: 'sre-agent'
+    webhook_configs:
+      - url: 'http://your-server:9000/webhook/alertmanager'
+        send_resolved: false
+EOF
 ```
 
-### Slack Integration (Coming)
+Supported webhooks:
+- **Alertmanager**: `POST /webhook/alertmanager`
+- **PagerDuty**: `POST /webhook/pagerduty`
+- **Generic**: `POST /webhook/alert`
 
-- Send remediation proposals to Slack
-- Approval buttons
-- Status updates
-- Postmortem sharing
+See [Webhook Server Guide](docs/WEBHOOK_SERVER.md) for deployment instructions.
+
+### Slack Integration
+
+Send incident notifications and approval requests to Slack:
+
+```bash
+# Set environment variables
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+export SLACK_BOT_TOKEN="xoxb-your-bot-token"
+export SLACK_CHANNEL="#sre-incidents"
+```
+
+The agent will:
+- Send incident notifications to Slack
+- Post approval requests with interactive buttons
+- Update messages with execution results
+
+See [Slack Integration Guide](docs/SLACK_INTEGRATION.md) for setup.
 
 ### Kubernetes Deployment
 
+Deploy the agent as a Kubernetes service:
+
 ```yaml
-# Deploy as K8s service
-# ServiceAccount with read-only cluster access
-# Optional: write access to staging namespaces
+# Deploy webhook server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-agent-webhook
+  namespace: monitoring
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sre-agent-webhook
+  template:
+    metadata:
+      labels:
+        app: sre-agent-webhook
+    spec:
+      serviceAccountName: sre-agent
+      containers:
+      - name: webhook
+        image: sre-agent-webhook:latest
+        ports:
+        - containerPort: 9000
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sre-agent-secrets
+              key: openai-api-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sre-agent-webhook
+  namespace: monitoring
+spec:
+  selector:
+    app: sre-agent-webhook
+  ports:
+  - port: 9000
+    targetPort: 9000
 ```
+
+Create RBAC permissions:
+
+```yaml
+# ServiceAccount with read/write access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-agent
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sre-agent
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "services", "events"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+```
+
+See [Webhook Server Guide](docs/WEBHOOK_SERVER.md) for complete deployment instructions.
 
 ## Roadmap
 
@@ -285,13 +502,42 @@ def receive_alert(alert: AlertPayload):
 
 ## Contributing
 
-This is a commercial product template. For production use:
+### Current Features ✅
 
-1. Add real Slack integration
-2. Implement proper JSON parsing (replace `eval()`)
-3. Add comprehensive tests
-4. Set up CI/CD
-5. Harden security (secrets management)
+- ✅ **LangGraph workflow** with checkpoints and HITL
+- ✅ **5 specialized agents** (triage, hypothesis, diagnostics, remediation, postmortem)
+- ✅ **Kubernetes tools** for pod diagnostics and remediation
+- ✅ **Approval workflow** with CLI, UI, and API
+- ✅ **Automated execution** with rollback on failure
+- ✅ **Streamlit web UI** with approval buttons
+- ✅ **FastAPI REST API** with approval endpoints
+- ✅ **Slack integration** with interactive approval buttons
+- ✅ **Webhook server** for Alertmanager, PagerDuty, and custom alerts
+- ✅ **Real integration tests** with actual Kubernetes
+
+### Production Readiness Checklist
+
+For production deployment, complete these improvements:
+
+1. **Code Quality**
+   - [ ] Replace `eval()` with proper JSON parsing
+   - [ ] Add comprehensive error handling
+   - [ ] Implement structured logging
+
+2. **Testing**
+   - [x] Integration tests with real Kubernetes
+   - [ ] Unit tests for all agents
+   - [ ] Load testing for webhook server
+
+3. **Security**
+   - [ ] Secrets management (HashiCorp Vault)
+   - [ ] Webhook signature validation
+   - [ ] Rate limiting on API endpoints
+
+4. **Observability**
+   - [ ] Prometheus metrics endpoint
+   - [ ] Distributed tracing (Jaeger)
+   - [ ] Structured logging with correlation IDs
 
 ## License
 

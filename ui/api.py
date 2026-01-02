@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from app.graph.graph import create_incident_response_app
 from app.graph.state import create_initial_state
+from app.approval import get_approval_manager, ApprovalStatus
+from app.tools.remediation_executor import RemediationExecutor
 
 app = FastAPI(
     title="SRE Autonomous Agent API",
@@ -46,6 +48,13 @@ class IncidentResponse(BaseModel):
     incident_id: str
     status: str
     message: str
+
+
+class ApprovalAction(BaseModel):
+    """Approval action model"""
+    approved_by: str = "api-user"
+    comment: Optional[str] = None
+    reason: Optional[str] = None
 
 
 @app.get("/")
@@ -228,6 +237,159 @@ async def get_example_alerts():
             })
     
     return examples
+
+
+@app.get("/api/approvals")
+async def list_approvals(status: Optional[str] = None):
+    """
+    List approval requests
+    
+    Query params:
+    - status: Filter by status (pending, approved, rejected)
+    """
+    try:
+        approval_manager = get_approval_manager()
+        
+        if status == "pending" or status is None:
+            # Get pending approvals
+            pending = approval_manager.list_pending()
+            return [{
+                "approval_id": r.approval_id,
+                "incident_id": r.incident_id,
+                "root_cause": r.root_cause,
+                "remediation_action": r.remediation_action,
+                "risk_level": r.risk_level,
+                "status": r.status.value,
+                "created_at": r.created_at
+            } for r in pending]
+        
+        # Load all approvals and filter by status
+        approvals_dir = Path("approvals")
+        if not approvals_dir.exists():
+            return []
+        
+        results = []
+        for file in approvals_dir.glob("*.json"):
+            with open(file) as f:
+                data = json.load(f)
+                if status is None or data.get("status") == status:
+                    results.append(data)
+        
+        return sorted(results, key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/approvals/{incident_id}")
+async def get_approval(incident_id: str):
+    """
+    Get approval request for a specific incident
+    """
+    try:
+        approval_file = Path("approvals") / f"{incident_id}.json"
+        
+        if not approval_file.exists():
+            raise HTTPException(status_code=404, detail="Approval request not found")
+        
+        with open(approval_file) as f:
+            data = json.load(f)
+        
+        return data
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/approvals/{incident_id}/approve")
+async def approve_remediation(incident_id: str, action: ApprovalAction):
+    """
+    Approve a remediation action
+    
+    This will:
+    1. Mark the approval as approved
+    2. Execute the remediation
+    3. Return the execution result
+    """
+    try:
+        approval_manager = get_approval_manager()
+        executor = RemediationExecutor()
+        
+        # Get the approval request
+        pending = approval_manager.list_pending()
+        request = next((r for r in pending if r.incident_id == incident_id), None)
+        
+        if not request:
+            raise HTTPException(status_code=404, detail="No pending approval found for this incident")
+        
+        # Approve the remediation
+        approval_manager.approve(
+            incident_id,
+            action.approved_by,
+            action.comment
+        )
+        
+        # Execute the remediation
+        success, message = executor.execute_remediation(
+            incident_id,
+            request.remediation_plan,
+            request.alert_data
+        )
+        
+        return {
+            "incident_id": incident_id,
+            "status": "approved",
+            "execution_success": success,
+            "execution_message": message,
+            "approved_by": action.approved_by,
+            "approved_at": datetime.utcnow().isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/approvals/{incident_id}/reject")
+async def reject_remediation(incident_id: str, action: ApprovalAction):
+    """
+    Reject a remediation action
+    """
+    try:
+        if not action.reason:
+            raise HTTPException(status_code=400, detail="Rejection reason is required")
+        
+        approval_manager = get_approval_manager()
+        
+        # Get the approval request
+        pending = approval_manager.list_pending()
+        request = next((r for r in pending if r.incident_id == incident_id), None)
+        
+        if not request:
+            raise HTTPException(status_code=404, detail="No pending approval found for this incident")
+        
+        # Reject the remediation
+        approval_manager.reject(
+            incident_id,
+            action.approved_by,
+            action.reason
+        )
+        
+        return {
+            "incident_id": incident_id,
+            "status": "rejected",
+            "rejected_by": action.approved_by,
+            "rejected_at": datetime.utcnow().isoformat(),
+            "reason": action.reason
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

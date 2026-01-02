@@ -24,8 +24,17 @@
 - [ ] Add comprehensive error handling
 - [ ] Implement proper logging (structured)
 - [ ] Add unit tests for all agents
-- [ ] Add integration tests
+- [x] Add integration tests (with real Kubernetes)
 - [ ] Security hardening (secrets management)
+
+### Human-in-the-Loop Approval ✓
+- [x] Approval state management (ApprovalManager)
+- [x] CLI approval command (`python -m app.cli.approve`)
+- [x] Remediation executor with rollback
+- [x] Integration with workflow graph
+- [ ] UI approval buttons (Streamlit)
+- [ ] API endpoint for approvals
+- [ ] Slack approval integration
 
 ### Slack Integration
 - [ ] Slack webhook setup
