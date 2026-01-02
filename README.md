@@ -207,6 +207,73 @@ Edit `app/policies/guardrails.yaml` to customize:
 - Risk thresholds
 - Time windows for changes
 
+## Human Approval Workflow
+
+The agent **never** executes remediations without explicit human approval.
+
+### CLI Approval
+
+When the agent proposes a remediation, you'll see:
+
+```
+HUMAN APPROVAL REQUIRED
+================================================================================
+Approval ID: approval-abc123
+Incident: CrashLoopBackOff
+Root Cause: Missing DATABASE_URL environment variable
+
+Proposed Remediation:
+  Action: Add DATABASE_URL to deployment env
+  Risk: low
+  Requires PR: Yes
+
+To approve, run:
+  python -m app.cli.approve INC-20251229-a3f8b2e1
+================================================================================
+```
+
+**Approve the remediation:**
+
+```bash
+python -m app.cli.approve INC-20251229-a3f8b2e1
+```
+
+**List pending approvals:**
+
+```bash
+python -m app.cli.approve --list
+```
+
+**Reject a remediation:**
+
+```bash
+python -m app.cli.approve --reject INC-20251229-a3f8b2e1 --reason "Too risky"
+```
+
+### Automated Execution
+
+Once approved, the agent will:
+
+1. **Execute** the remediation (patch deployment, add env vars, etc.)
+2. **Verify** deployment health
+3. **Rollback** automatically if verification fails
+4. **Document** the outcome in the postmortem
+
+### Rollback Protection
+
+The executor saves deployment state before changes and automatically rolls back if:
+- Deployment fails health check within 60 seconds
+- New pods don't reach Ready state
+- Remediation execution throws errors
+
+Manual rollback is also available:
+
+```python
+from app.tools.remediation_executor import RemediationExecutor
+executor = RemediationExecutor()
+executor.rollback("INC-20251229-a3f8b2e1")
+```
+
 ## Example Output
 
 After running on the example alert:
@@ -226,6 +293,14 @@ Root Cause: Missing DATABASE_URL environment variable
 Proposed: Add DATABASE_URL to deployment env
 Risk: low
 Requires PR: Yes
+
+[After approval]
+✓ Remediation approved for incident INC-20251229-a3f8b2e1
+Executing remediation...
+Added DATABASE_URL environment variable
+Waiting for deployment rollout...
+Deployment my-app is healthy
+✓ Successfully applied config change to my-app
 
 Postmortem saved: postmortems/INC-20251229-a3f8b2e1.md
 ```

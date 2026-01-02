@@ -15,6 +15,8 @@ from app.agents.hypothesis import hypothesis_agent
 from app.agents.diagnostics import diagnostics_agent
 from app.agents.remediation import remediation_agent
 from app.agents.postmortem import postmortem_agent
+from app.approval import get_approval_manager, ApprovalStatus
+from app.tools.remediation_executor import RemediationExecutor
 
 
 def should_continue_after_triage(state: IncidentState) -> Literal["hypothesis", "error"]:
@@ -42,21 +44,49 @@ def human_approval_node(state: IncidentState) -> IncidentState:
     """
     Human-in-the-loop checkpoint.
     
-    In production, this would:
-    - Send Slack message with remediation plan
-    - Wait for approval/rejection
-    - Update state based on response
-    
-    For MVP, we'll simulate approval or require manual intervention.
+    Creates an approval request and waits for human approval.
+    Once approved, executes the remediation.
     """
     
-    # TODO: Implement actual Slack integration
-    # For now, this is a placeholder that requires external state update
+    approval_manager = get_approval_manager()
+    executor = RemediationExecutor()
+    
+    incident_id = state["incident_id"]
+    
+    # Check if already approved
+    if approval_manager.is_approved(incident_id):
+        print(f"\n✓ Remediation already approved for incident {incident_id}")
+        
+        # Execute the remediation
+        success, message = executor.execute_remediation(
+            incident_id,
+            state["remediation_plan"],
+            state["alert"]
+        )
+        
+        state["remediation_executed"] = success
+        state["execution_result"] = message
+        
+        if not success:
+            state["errors"].append(f"Remediation execution failed: {message}")
+        
+        return state
+    
+    # Create approval request
+    approval_id = approval_manager.create_approval_request(
+        incident_id=incident_id,
+        root_cause=state["root_cause"],
+        remediation_action=state["remediation_plan"]["description"],
+        risk_level=state["remediation_plan"]["risk_level"],
+        alert_data=state["alert"],
+        remediation_plan=state["remediation_plan"]
+    )
     
     print("\n" + "="*80)
     print("HUMAN APPROVAL REQUIRED")
     print("="*80)
-    print(f"\nIncident: {state['incident_type']}")
+    print(f"\nApproval ID: {approval_id}")
+    print(f"Incident: {state['incident_type']}")
     print(f"Root Cause: {state['root_cause']}")
     print(f"\nProposed Remediation:")
     print(f"  Action: {state['remediation_plan']['description']}")
@@ -64,11 +94,14 @@ def human_approval_node(state: IncidentState) -> IncidentState:
     print(f"  Requires PR: {state['remediation_plan']['requires_pr']}")
     if state['remediation_plan'].get('command'):
         print(f"  Command: {state['remediation_plan']['command']}")
-    print("\n" + "="*80)
+    print("\nTo approve, run:")
+    print(f"  python -m app.cli.approve {incident_id}")
+    print("="*80)
     
-    # In real implementation, this would pause and wait for external input
-    # For demo, we'll mark as pending approval
-    state["approved"] = False  # Will be updated externally
+    # Mark as pending approval
+    state["approved"] = False
+    state["approval_id"] = approval_id
+    state["remediation_executed"] = False
     
     return state
 
