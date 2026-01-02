@@ -8,6 +8,7 @@ and managing the autonomous incident response system.
 import streamlit as st
 import json
 import os
+import time
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -70,6 +71,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+@st.cache_data(ttl=30)  # Cache for 30 seconds
 def load_postmortems():
     """Load all postmortem files"""
     postmortem_dir = Path("postmortems")
@@ -92,6 +94,7 @@ def load_postmortems():
     return sorted(postmortems, key=lambda x: x['timestamp'], reverse=True)
 
 
+@st.cache_data(ttl=60)  # Cache for 60 seconds
 def load_example_alerts():
     """Load example alert templates"""
     examples_dir = Path("examples")
@@ -397,13 +400,34 @@ def render_approvals():
     st.markdown('<h1 class="main-header">Remediation Approvals</h1>', unsafe_allow_html=True)
     st.markdown("Review and approve/reject proposed remediations")
     
-    # Import approval manager
+    # Import approval manager (lazy import to avoid slow startup)
     try:
-        from app.approval import get_approval_manager, ApprovalStatus
-        from app.tools.remediation_executor import RemediationExecutor
+        import sys
+        import importlib.util
+        
+        # Add project root to Python path (parent of ui directory)
+        project_root = Path(__file__).parent.parent.resolve()
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        
+        # Load manager.py directly to avoid relative import issues
+        manager_path = project_root / "app" / "approval" / "manager.py"
+        if not manager_path.exists():
+            raise ImportError(f"Approval manager not found at {manager_path}")
+        
+        spec = importlib.util.spec_from_file_location("approval_manager_module", manager_path)
+        manager_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(manager_module)
+        
+        get_approval_manager = manager_module.get_approval_manager
+        ApprovalStatus = manager_module.ApprovalStatus
         approval_manager = get_approval_manager()
-    except ImportError:
-        st.error("Approval system not available. Please check installation.")
+    except Exception as e:
+        st.error(f"Approval system not available: {str(e)}")
+        st.info("Make sure you're running from the project root directory and dependencies are installed.")
+        import traceback
+        with st.expander("Error Details"):
+            st.code(traceback.format_exc())
         return
     
     # Tabs for different statuses
@@ -445,30 +469,65 @@ def render_approvals():
                         
                         with col_approve:
                             if st.button("✓ Approve", key=f"approve_{request.incident_id}", type="primary"):
-                                try:
-                                    # Approve the remediation
-                                    approval_manager.approve(
-                                        request.incident_id,
-                                        "ui-user",
-                                        comment if comment else None
-                                    )
-                                    
-                                    # Execute remediation
-                                    executor = RemediationExecutor()
-                                    success, message = executor.execute_remediation(
-                                        request.incident_id,
-                                        request.remediation_plan,
-                                        request.alert_data
-                                    )
-                                    
-                                    if success:
-                                        st.success(f"Remediation approved and executed: {message}")
-                                    else:
-                                        st.error(f"Remediation approved but execution failed: {message}")
-                                    
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                with st.spinner("Approving and executing remediation..."):
+                                    try:
+                                        # Approve the remediation
+                                        approval_manager.approve(
+                                            request.incident_id,
+                                            "ui-user",
+                                            comment if comment else None
+                                        )
+                                        st.success("✅ Remediation approved!")
+                                        
+                                        # Execute remediation (lazy import)
+                                        execution_attempted = False
+                                        try:
+                                            import sys
+                                            import importlib.util
+                                            
+                                            project_root = Path(__file__).parent.parent.resolve()
+                                            if str(project_root) not in sys.path:
+                                                sys.path.insert(0, str(project_root))
+                                            
+                                            # Load remediation_executor.py directly to avoid import conflicts
+                                            executor_path = project_root / "app" / "tools" / "remediation_executor.py"
+                                            if not executor_path.exists():
+                                                raise ImportError(f"Remediation executor not found at {executor_path}")
+                                            
+                                            spec = importlib.util.spec_from_file_location("remediation_executor_module", executor_path)
+                                            executor_module = importlib.util.module_from_spec(spec)
+                                            spec.loader.exec_module(executor_module)
+                                            
+                                            RemediationExecutor = executor_module.RemediationExecutor
+                                            executor = RemediationExecutor()
+                                            execution_attempted = True
+                                            
+                                            st.info("🔧 Executing remediation...")
+                                            success, message = executor.execute_remediation(
+                                                request.incident_id,
+                                                request.remediation_plan,
+                                                request.alert_data
+                                            )
+                                            
+                                            if success:
+                                                st.success(f"✅ Remediation executed successfully: {message}")
+                                                st.info("� Refreshing page in 2 seconds...")
+                                                time.sleep(2)
+                                                st.rerun()
+                                            else:
+                                                st.error(f"⚠️ Execution failed: {message}")
+                                        except Exception as exec_error:
+                                            if execution_attempted:
+                                                st.error(f"❌ Execution error: {str(exec_error)}")
+                                                import traceback
+                                                with st.expander("📋 Full Error Details (Click to expand)"):
+                                                    st.code(traceback.format_exc())
+                                            else:
+                                                st.warning(f"⚠️ Could not load executor: {str(exec_error)}")
+                                                st.info("Manual execution required - run the command from the remediation plan")
+                                        
+                                    except Exception as e:
+                                        st.error(f"Error: {str(e)}")
                         
                         with col_reject:
                             if st.button("✗ Reject", key=f"reject_{request.incident_id}"):
