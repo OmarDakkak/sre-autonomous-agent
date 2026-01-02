@@ -36,13 +36,23 @@ class ApprovalRequest:
     requires_pr: bool
     status: str = ApprovalStatus.PENDING.value
     requested_at: str = None
+    created_at: str = None
     approved_at: Optional[str] = None
     approved_by: Optional[str] = None
     rejection_reason: Optional[str] = None
+    remediation_plan: Optional[Dict[str, Any]] = None
+    alert_data: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
         if self.requested_at is None:
             self.requested_at = datetime.utcnow().isoformat()
+        if self.created_at is None:
+            self.created_at = datetime.utcnow().isoformat()
+        # Ensure remediation_plan and alert_data are not None
+        if self.remediation_plan is None:
+            self.remediation_plan = {}
+        if self.alert_data is None:
+            self.alert_data = {}
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -66,6 +76,7 @@ class ApprovalManager:
         Create a new approval request from incident state
         """
         remediation = incident_state.get("remediation_plan", {})
+        alert = incident_state.get("alert", {})
         
         request = ApprovalRequest(
             incident_id=incident_state["incident_id"],
@@ -73,11 +84,13 @@ class ApprovalManager:
             root_cause=incident_state.get("root_cause", "Unknown"),
             remediation_action=remediation.get("description", ""),
             risk_level=remediation.get("risk_level", "unknown"),
-            namespace=incident_state.get("alert", {}).get("commonLabels", {}).get("namespace", ""),
-            pod=incident_state.get("alert", {}).get("commonLabels", {}).get("pod"),
-            deployment=incident_state.get("alert", {}).get("commonLabels", {}).get("deployment"),
+            namespace=alert.get("commonLabels", {}).get("namespace", ""),
+            pod=alert.get("commonLabels", {}).get("pod"),
+            deployment=alert.get("commonLabels", {}).get("deployment"),
             command=remediation.get("command"),
-            requires_pr=remediation.get("requires_pr", True)
+            requires_pr=remediation.get("requires_pr", True),
+            remediation_plan=remediation,
+            alert_data=alert
         )
         
         # Save to file
@@ -103,7 +116,7 @@ class ApprovalManager:
         
         return ApprovalRequest.from_dict(data)
     
-    def approve(self, incident_id: str, approved_by: str = "user") -> bool:
+    def approve(self, incident_id: str, approved_by: str = "user", comment: Optional[str] = None) -> bool:
         """Approve a remediation request"""
         request = self.get_request(incident_id)
         
@@ -113,12 +126,14 @@ class ApprovalManager:
         request.status = ApprovalStatus.APPROVED.value
         request.approved_at = datetime.utcnow().isoformat()
         request.approved_by = approved_by
+        if comment:
+            request.rejection_reason = comment  # Reusing this field for approval comments
         
         self._save_request(request)
         
         return True
     
-    def reject(self, incident_id: str, reason: str = "", rejected_by: str = "user") -> bool:
+    def reject(self, incident_id: str, rejected_by: str = "user", reason: str = "") -> bool:
         """Reject a remediation request"""
         request = self.get_request(incident_id)
         
