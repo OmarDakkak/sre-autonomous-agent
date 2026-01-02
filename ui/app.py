@@ -140,7 +140,7 @@ def render_sidebar():
         
         page = st.radio(
             "Navigation",
-            ["Dashboard", "Submit Alert", "Incidents", "Postmortems", "Settings"],
+            ["Dashboard", "Submit Alert", "Incidents", "Approvals", "Postmortems", "Settings"],
             label_visibility="collapsed"
         )
         
@@ -392,6 +392,155 @@ def render_incidents():
                     st.session_state['selected_postmortem'] = pm['id']
                     st.rerun()
 
+def render_approvals():
+    """Render approvals page with action buttons"""
+    st.markdown('<h1 class="main-header">Remediation Approvals</h1>', unsafe_allow_html=True)
+    st.markdown("Review and approve/reject proposed remediations")
+    
+    # Import approval manager
+    try:
+        from app.approval import get_approval_manager, ApprovalStatus
+        from app.tools.remediation_executor import RemediationExecutor
+        approval_manager = get_approval_manager()
+    except ImportError:
+        st.error("Approval system not available. Please check installation.")
+        return
+    
+    # Tabs for different statuses
+    tab1, tab2, tab3 = st.tabs(["Pending", "Approved", "Rejected"])
+    
+    with tab1:
+        st.subheader("Pending Approvals")
+        pending = approval_manager.list_pending()
+        
+        if not pending:
+            st.info("No pending approvals at this time.")
+        else:
+            for request in pending:
+                with st.expander(f"Incident {request.incident_id} - {request.risk_level.upper()} RISK", expanded=True):
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        st.markdown(f"**Root Cause:** {request.root_cause}")
+                        st.markdown(f"**Proposed Action:** {request.remediation_action}")
+                        st.markdown(f"**Risk Level:** {request.risk_level}")
+                        st.markdown(f"**Created:** {request.created_at}")
+                        
+                        # Show remediation details
+                        if request.remediation_plan:
+                            with st.expander("View Remediation Details"):
+                                st.json(request.remediation_plan)
+                    
+                    with col2:
+                        st.markdown("### Actions")
+                        
+                        # Approval comment
+                        comment = st.text_input(
+                            "Comment (optional)",
+                            key=f"comment_{request.incident_id}",
+                            placeholder="Add approval comment..."
+                        )
+                        
+                        col_approve, col_reject = st.columns(2)
+                        
+                        with col_approve:
+                            if st.button("✓ Approve", key=f"approve_{request.incident_id}", type="primary"):
+                                try:
+                                    # Approve the remediation
+                                    approval_manager.approve(
+                                        request.incident_id,
+                                        "ui-user",
+                                        comment if comment else None
+                                    )
+                                    
+                                    # Execute remediation
+                                    executor = RemediationExecutor()
+                                    success, message = executor.execute_remediation(
+                                        request.incident_id,
+                                        request.remediation_plan,
+                                        request.alert_data
+                                    )
+                                    
+                                    if success:
+                                        st.success(f"Remediation approved and executed: {message}")
+                                    else:
+                                        st.error(f"Remediation approved but execution failed: {message}")
+                                    
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {str(e)}")
+                        
+                        with col_reject:
+                            if st.button("✗ Reject", key=f"reject_{request.incident_id}"):
+                                reason = st.text_input(
+                                    "Rejection reason (required)",
+                                    key=f"reason_{request.incident_id}"
+                                )
+                                if reason:
+                                    try:
+                                        approval_manager.reject(
+                                            request.incident_id,
+                                            "ui-user",
+                                            reason
+                                        )
+                                        st.success("Remediation rejected")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error: {str(e)}")
+                                else:
+                                    st.warning("Please provide a rejection reason")
+    
+    with tab2:
+        st.subheader("Approved Remediations")
+        # Load all approvals and filter approved
+        approvals_dir = Path("approvals")
+        if approvals_dir.exists():
+            approved = []
+            for file in approvals_dir.glob("*.json"):
+                with open(file) as f:
+                    data = json.load(f)
+                    if data.get("status") == "approved":
+                        approved.append(data)
+            
+            if not approved:
+                st.info("No approved remediations yet.")
+            else:
+                for item in sorted(approved, key=lambda x: x.get("approved_at", ""), reverse=True):
+                    with st.expander(f"Incident {item['incident_id']}"):
+                        st.markdown(f"**Root Cause:** {item['root_cause']}")
+                        st.markdown(f"**Action:** {item['remediation_action']}")
+                        st.markdown(f"**Approved By:** {item.get('approved_by', 'Unknown')}")
+                        st.markdown(f"**Approved At:** {item.get('approved_at', 'Unknown')}")
+                        if item.get('comment'):
+                            st.markdown(f"**Comment:** {item['comment']}")
+        else:
+            st.info("No approvals directory found.")
+    
+    with tab3:
+        st.subheader("Rejected Remediations")
+        # Load all approvals and filter rejected
+        approvals_dir = Path("approvals")
+        if approvals_dir.exists():
+            rejected = []
+            for file in approvals_dir.glob("*.json"):
+                with open(file) as f:
+                    data = json.load(f)
+                    if data.get("status") == "rejected":
+                        rejected.append(data)
+            
+            if not rejected:
+                st.info("No rejected remediations.")
+            else:
+                for item in sorted(rejected, key=lambda x: x.get("rejected_at", ""), reverse=True):
+                    with st.expander(f"Incident {item['incident_id']}"):
+                        st.markdown(f"**Root Cause:** {item['root_cause']}")
+                        st.markdown(f"**Action:** {item['remediation_action']}")
+                        st.markdown(f"**Rejected By:** {item.get('rejected_by', 'Unknown')}")
+                        st.markdown(f"**Rejected At:** {item.get('rejected_at', 'Unknown')}")
+                        if item.get('rejection_reason'):
+                            st.markdown(f"**Reason:** {item['rejection_reason']}")
+        else:
+            st.info("No approvals directory found.")
 
 def render_postmortems():
     """Render postmortems page"""
@@ -482,6 +631,8 @@ def main():
         render_submit_alert()
     elif page == "Incidents":
         render_incidents()
+    elif page == "Approvals":
+        render_approvals()
     elif page == "Postmortems":
         render_postmortems()
     elif page == "Settings":
