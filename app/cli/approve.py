@@ -6,10 +6,9 @@ Command-line interface for approving/rejecting remediation actions.
 
 import sys
 import argparse
-from pathlib import Path
 from typing import Optional
 
-from app.approval import get_approval_manager, ApprovalStatus
+from app.approval import get_approval_manager
 from app.tools.remediation_executor import RemediationExecutor
 
 

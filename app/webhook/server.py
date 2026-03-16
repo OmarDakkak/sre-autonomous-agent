@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 import json
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 import uvicorn
 
@@ -80,7 +80,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -116,7 +116,7 @@ async def alertmanager_webhook(
         
         for alert in firing_alerts:
             # Generate incident ID
-            incident_id = f"INC-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8]}"
+            incident_id = f"INC-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8]}"
             
             # Convert to our alert format
             alert_payload = convert_alertmanager_to_alert(webhook, alert)
@@ -169,7 +169,7 @@ async def pagerduty_webhook(
         payload = await request.json()
         
         print(f"\n{'='*80}")
-        print(f"Received PagerDuty webhook")
+        print("Received PagerDuty webhook")
         print(f"{'='*80}\n")
         
         messages = payload.get("messages", [])
@@ -183,7 +183,7 @@ async def pagerduty_webhook(
             incident = message.get("incident", {})
             
             # Generate incident ID
-            incident_id = f"INC-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8]}"
+            incident_id = f"INC-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8]}"
             
             # Convert to our alert format
             alert_payload = convert_pagerduty_to_alert(incident)
@@ -226,7 +226,7 @@ async def generic_alert_webhook(
         alert_payload = await request.json()
         
         # Generate incident ID
-        incident_id = f"INC-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8]}"
+        incident_id = f"INC-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8]}"
         
         # Save alert
         save_alert(alert_payload, incident_id)
@@ -296,7 +296,7 @@ def convert_pagerduty_to_alert(incident: Dict[str, Any]) -> Dict[str, Any]:
             "description": incident.get("body", {}).get("details", ""),
             "incident_url": incident.get("html_url", "")
         },
-        "startsAt": incident.get("created_at", datetime.utcnow().isoformat())
+        "startsAt": incident.get("created_at", datetime.now(timezone.utc).isoformat())
     }
 
 
@@ -372,11 +372,11 @@ def start_webhook_server(host: str = "0.0.0.0", port: int = 9000):
         port: Port to listen on (default: 9000)
     """
     print(f"\n{'='*80}")
-    print(f"Starting SRE Agent Webhook Server")
+    print("Starting SRE Agent Webhook Server")
     print(f"{'='*80}")
     print(f"Host: {host}")
     print(f"Port: {port}")
-    print(f"\nEndpoints:")
+    print("\nEndpoints:")
     print(f"  - Alertmanager: http://{host}:{port}/webhook/alertmanager")
     print(f"  - PagerDuty:    http://{host}:{port}/webhook/pagerduty")
     print(f"  - Generic:      http://{host}:{port}/webhook/alert")

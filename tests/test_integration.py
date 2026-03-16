@@ -23,7 +23,7 @@ def k8s_client():
     """Load Kubernetes config and return API client"""
     try:
         config.load_kube_config()
-    except:
+    except Exception:
         # Try in-cluster config if kubeconfig not found
         config.load_incluster_config()
     

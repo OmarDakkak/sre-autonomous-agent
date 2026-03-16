@@ -8,7 +8,7 @@ Handles approval/rejection actions via Slack Interactivity.
 import os
 import json
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 from pathlib import Path
 
@@ -89,7 +89,7 @@ class SlackIntegration:
                     }
                 ],
                 "footer": "SRE Autonomous Agent",
-                "ts": int(datetime.utcnow().timestamp())
+                "ts": int(datetime.now(timezone.utc).timestamp())
             }]
         }
         
@@ -161,7 +161,7 @@ class SlackIntegration:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"⚠️ Remediation Approval Required"
+                        "text": "⚠️ Remediation Approval Required"
                     }
                 },
                 {
@@ -463,7 +463,7 @@ class SlackIntegration:
                     }
                 ],
                 "footer": "SRE Autonomous Agent",
-                "ts": int(datetime.utcnow().timestamp())
+                "ts": int(datetime.now(timezone.utc).timestamp())
             }]
         }
         

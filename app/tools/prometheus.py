@@ -4,7 +4,6 @@ Prometheus Metrics Tools
 Query Prometheus for metrics related to incidents.
 """
 
-from typing import Optional, List, Dict
 from datetime import datetime, timedelta
 from prometheus_api_client import PrometheusConnect
 from langchain_core.tools import tool

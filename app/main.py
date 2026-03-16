@@ -7,7 +7,7 @@ This module provides webhook handlers and CLI interface.
 import json
 import os
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -30,7 +30,7 @@ def handle_alert_webhook(alert_payload: dict) -> dict:
     """
     
     # Generate incident ID
-    incident_id = f"INC-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8]}"
+    incident_id = f"INC-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8]}"
     
     print(f"\nAlert received: {incident_id}")
     print(f"Alert: {alert_payload.get('commonLabels', {}).get('alertname', 'Unknown')}")
@@ -103,7 +103,7 @@ def run_from_file(alert_file: str):
     if result['status'] == 'success':
         print(f"Incident Type: {result['incident_type']}")
         print(f"Root Cause: {result['root_cause']}")
-        print(f"\nRemediation Plan:")
+        print("\nRemediation Plan:")
         print(f"  {result['remediation_plan']['description']}")
         print(f"  Risk: {result['remediation_plan']['risk_level']}")
         print(f"  Requires Approval: {result['requires_approval']}")

@@ -6,7 +6,7 @@ auditability and deterministic reasoning.
 """
 
 from typing import TypedDict, Literal, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Hypothesis(TypedDict):
@@ -76,9 +76,11 @@ class IncidentState(TypedDict):
     
     # Human approval checkpoint
     approved: bool
+    approval_id: Optional[str]
     approval_comment: Optional[str]
     
     # Execution status (for future auto-fix)
+    remediation_executed: bool
     execution_status: Optional[Literal["pending", "running", "success", "failed"]]
     execution_result: Optional[str]
     
@@ -98,7 +100,7 @@ class IncidentState(TypedDict):
 
 def create_initial_state(alert: dict, incident_id: str) -> IncidentState:
     """Create initial state from incoming alert"""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     
     return IncidentState(
         alert=alert,
@@ -112,7 +114,9 @@ def create_initial_state(alert: dict, incident_id: str) -> IncidentState:
         remediation_plan=None,
         alternative_plans=[],
         approved=False,
+        approval_id=None,
         approval_comment=None,
+        remediation_executed=False,
         execution_status=None,
         execution_result=None,
         postmortem=None,
@@ -138,7 +142,7 @@ def add_timeline_entry(
 ) -> IncidentState:
     """Helper to add timeline entries"""
     entry = TimelineEntry(
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         agent=agent,
         action=action,
         details=details

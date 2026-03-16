@@ -5,7 +5,7 @@ Safe, read-only tools for gathering K8s diagnostics.
 All tools validate against guardrails before execution.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from kubernetes import client, config
 from langchain_core.tools import tool
 import yaml
@@ -16,7 +16,7 @@ def init_k8s_client():
     try:
         # Try in-cluster config first
         config.load_incluster_config()
-    except:
+    except Exception:
         # Fall back to kubeconfig
         config.load_kube_config()
     
