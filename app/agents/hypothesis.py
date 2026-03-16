@@ -7,6 +7,8 @@ Responsibilities:
 - Based on incident type and context
 """
 
+import json
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
@@ -85,7 +87,6 @@ Generate hypotheses for this incident.
     response = llm.invoke(messages)
     
     # Parse response
-    import json
     try:
         response_text = response.content
         # Find JSON array

@@ -8,6 +8,9 @@ Responsibilities:
 - Assess risk and blast radius
 """
 
+import json
+from pathlib import Path
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 import yaml
@@ -17,6 +20,8 @@ from app.graph.state import IncidentState, RemediationAction, add_timeline_entry
 
 # Load environment variables
 load_dotenv()
+
+_GUARDRAILS_PATH = Path(__file__).parent.parent / "policies" / "guardrails.yaml"
 
 
 REMEDIATION_SYSTEM_PROMPT = """You are a Kubernetes SRE remediation specialist.
@@ -69,7 +74,7 @@ Output JSON format:
 
 def load_guardrails():
     """Load guardrails policy"""
-    with open("app/policies/guardrails.yaml", "r") as f:
+    with open(_GUARDRAILS_PATH, "r") as f:
         return yaml.safe_load(f)
 
 
@@ -122,7 +127,6 @@ Propose remediation actions.
     response = llm.invoke(messages)
     
     # Parse response
-    import json
     try:
         response_text = response.content
         # Find JSON block

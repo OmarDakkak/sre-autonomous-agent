@@ -8,7 +8,8 @@ Responsibilities:
 - NO speculation, only classification
 """
 
-from typing import Any
+import json
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
@@ -88,7 +89,6 @@ Classify this incident precisely.
     response = llm.invoke(messages)
     
     # Parse response
-    import json
     try:
         # Try to extract JSON from response
         response_text = response.content

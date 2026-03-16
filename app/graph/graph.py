@@ -15,7 +15,7 @@ from app.agents.hypothesis import hypothesis_agent
 from app.agents.diagnostics import diagnostics_agent
 from app.agents.remediation import remediation_agent
 from app.agents.postmortem import postmortem_agent
-from app.approval import get_approval_manager, ApprovalStatus
+from app.approval import get_approval_manager
 from app.tools.remediation_executor import RemediationExecutor
 
 
@@ -73,14 +73,8 @@ def human_approval_node(state: IncidentState) -> IncidentState:
         return state
     
     # Create approval request
-    approval_id = approval_manager.create_approval_request(
-        incident_id=incident_id,
-        root_cause=state["root_cause"],
-        remediation_action=state["remediation_plan"]["description"],
-        risk_level=state["remediation_plan"]["risk_level"],
-        alert_data=state["alert"],
-        remediation_plan=state["remediation_plan"]
-    )
+    approval_request = approval_manager.create_approval_request(state)
+    approval_id = approval_request.incident_id
     
     print("\n" + "="*80)
     print("HUMAN APPROVAL REQUIRED")
@@ -88,7 +82,7 @@ def human_approval_node(state: IncidentState) -> IncidentState:
     print(f"\nApproval ID: {approval_id}")
     print(f"Incident: {state['incident_type']}")
     print(f"Root Cause: {state['root_cause']}")
-    print(f"\nProposed Remediation:")
+    print("\nProposed Remediation:")
     print(f"  Action: {state['remediation_plan']['description']}")
     print(f"  Risk: {state['remediation_plan']['risk_level']}")
     print(f"  Requires PR: {state['remediation_plan']['requires_pr']}")

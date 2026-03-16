@@ -8,6 +8,8 @@ Responsibilities:
 - Determine root cause
 """
 
+import json
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
@@ -59,7 +61,7 @@ def diagnostics_agent(state: IncidentState) -> IncidentState:
     
     # Load environment variables
     load_dotenv()
-    
+
     affected_resources = state["affected_resources"]
     namespace = affected_resources.get("namespace")
     pod_name = affected_resources.get("pod")
@@ -163,8 +165,7 @@ Output as JSON:
         
         response = llm.invoke(messages)
         
-        # Parse the response (simplified - in production use proper JSON parsing)
-        import json
+        # Parse the response
         try:
             # Try to extract JSON from response
             response_text = response.content
@@ -181,7 +182,7 @@ Output as JSON:
                     "evidence": ["See diagnostic output"],
                     "confidence": 0.7
                 }
-        except:
+        except (json.JSONDecodeError, Exception):
             root_cause_data = {
                 "root_cause": response.content[:500],
                 "evidence": ["See diagnostic output"],

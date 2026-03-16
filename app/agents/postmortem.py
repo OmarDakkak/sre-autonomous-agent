@@ -8,7 +8,7 @@ Responsibilities:
 - Output in Markdown format
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.graph.state import IncidentState, add_timeline_entry
 
 
@@ -81,7 +81,7 @@ def postmortem_agent(state: IncidentState) -> IncidentState:
     
     # Calculate duration
     start = datetime.fromisoformat(state["started_at"])
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc)
     duration = str(end - start).split('.')[0]  # Remove microseconds
     
     # Format timeline
@@ -144,7 +144,7 @@ def postmortem_agent(state: IncidentState) -> IncidentState:
         alternatives=alternatives_md,
         preventive_measures=preventive_measures,
         lessons_learned=lessons_learned,
-        generated_at=datetime.utcnow().isoformat()
+        generated_at=datetime.now(timezone.utc).isoformat()
     )
     
     state["postmortem"] = postmortem

@@ -4,7 +4,6 @@ Log Query Tools
 Query logs from Loki or other log aggregation systems.
 """
 
-from typing import Optional
 from datetime import datetime, timedelta
 from langchain_core.tools import tool
 import httpx

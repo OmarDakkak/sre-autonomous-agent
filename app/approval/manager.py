@@ -7,7 +7,7 @@ for remediation actions.
 
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -45,9 +45,9 @@ class ApprovalRequest:
     
     def __post_init__(self):
         if self.requested_at is None:
-            self.requested_at = datetime.utcnow().isoformat()
+            self.requested_at = datetime.now(timezone.utc).isoformat()
         if self.created_at is None:
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(timezone.utc).isoformat()
         # Ensure remediation_plan and alert_data are not None
         if self.remediation_plan is None:
             self.remediation_plan = {}
@@ -124,7 +124,7 @@ class ApprovalManager:
             return False
         
         request.status = ApprovalStatus.APPROVED.value
-        request.approved_at = datetime.utcnow().isoformat()
+        request.approved_at = datetime.now(timezone.utc).isoformat()
         request.approved_by = approved_by
         if comment:
             request.rejection_reason = comment  # Reusing this field for approval comments
@@ -141,7 +141,7 @@ class ApprovalManager:
             return False
         
         request.status = ApprovalStatus.REJECTED.value
-        request.approved_at = datetime.utcnow().isoformat()
+        request.approved_at = datetime.now(timezone.utc).isoformat()
         request.approved_by = rejected_by
         request.rejection_reason = reason
         

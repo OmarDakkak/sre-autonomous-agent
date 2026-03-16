@@ -7,12 +7,12 @@ Includes rollback capability for safety.
 
 import subprocess
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from pathlib import Path
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class RemediationExecutor:
@@ -21,7 +21,7 @@ class RemediationExecutor:
     def __init__(self):
         try:
             config.load_kube_config()
-        except:
+        except Exception:
             config.load_incluster_config()
         
         self.apps_api = client.AppsV1Api()
@@ -178,7 +178,7 @@ class RemediationExecutor:
             
             deployment.spec.template.metadata.annotations[
                 "kubectl.kubernetes.io/restartedAt"
-            ] = datetime.utcnow().isoformat()
+            ] = datetime.now(timezone.utc).isoformat()
             
             self.apps_api.patch_namespaced_deployment(
                 deployment_name,
@@ -270,7 +270,7 @@ class RemediationExecutor:
         
         data = {
             "incident_id": incident_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "deployment_name": deployment.metadata.name,
             "namespace": deployment.metadata.namespace,
             "spec": client.ApiClient().sanitize_for_serialization(deployment.spec)
